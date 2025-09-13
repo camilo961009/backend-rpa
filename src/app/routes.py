@@ -14,6 +14,19 @@ def is_valid_nombre(nombre):
 def is_valid_estado(estado):
     """Valida que el estado sea uno permitido."""
     return estado in ["PENDIENTE", "PROCESADO", "ERROR"]
+@bp.route("/", methods=["GET"])
+def home():
+    return jsonify({
+        "status": "ok",
+        "message": "API RPA Empresas funcionando 🚀",
+        "endpoints": [
+            {"path": "/process-data", "method": "POST"},
+            {"path": "/update-status", "method": "POST"},
+            {"path": "/empresas", "method": "GET"},
+            {"path": "/empresa/<nit>", "method": "GET"},
+            {"path": "/empresa/<nit>", "method": "DELETE"}
+        ]
+    }), 200
 
 @bp.route('/process-data', methods=['POST'])
 def process_data():
@@ -182,3 +195,4 @@ def eliminar_empresa(nit):
     db.session.delete(empresa)
     db.session.commit()
     return jsonify({"message": "Empresa eliminada correctamente"}), 200
+
