@@ -1,0 +1,184 @@
+from flask import Blueprint, request, jsonify
+from .models import db, Empresa
+
+bp = Blueprint("api", __name__)
+
+def is_valid_nit(nit):
+    """Valida que el NIT sea numérico y de longitud adecuada (ej: 6-15 caracteres)."""
+    return isinstance(nit, str) and nit.isdigit() and 6 <= len(nit) <= 15
+
+def is_valid_nombre(nombre):
+    """Valida que el nombre sea una cadena no vacía y sin solo espacios."""
+    return isinstance(nombre, str) and nombre.strip() != ""
+
+def is_valid_estado(estado):
+    """Valida que el estado sea uno permitido."""
+    return estado in ["PENDIENTE", "PROCESADO", "ERROR"]
+
+@bp.route('/process-data', methods=['POST'])
+def process_data():
+    """
+    Procesa y almacena datos de una empresa.
+    ---
+    post:
+      description: Almacena una nueva empresa si el NIT no existe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nit: {type: string}
+                nombre: {type: string}
+                datos: {type: object}
+      responses:
+        200: {description: Empresa almacenada correctamente}
+        400: {description: Error en la petición}
+    """
+    data = request.get_json()
+    nit = data.get("nit")
+    nombre = data.get("nombre")
+    datos = data.get("datos", {})
+
+    # Validaciones avanzadas
+    if not is_valid_nit(nit):
+        return jsonify({"error": "NIT inválido. Debe ser numérico y de 6-15 dígitos."}), 400
+    if not is_valid_nombre(nombre):
+        return jsonify({"error": "Nombre de empresa inválido."}), 400
+    if not isinstance(datos, dict):
+        return jsonify({"error": "El campo 'datos' debe ser un objeto/dict."}), 400
+
+    if Empresa.query.filter_by(nit=nit).first():
+        return jsonify({"error": "Empresa con ese NIT ya existe."}), 400
+
+    empresa = Empresa(nit=nit, nombre=nombre, datos=datos)
+    db.session.add(empresa)
+    db.session.commit()
+    return jsonify({"message": "Empresa almacenada correctamente", "empresa": empresa.as_dict()}), 200
+
+@bp.route('/update-status', methods=['POST'])
+def update_status():
+    """
+    Actualiza el estado de una empresa según su NIT.
+    ---
+    post:
+      description: Cambia el estado de una empresa existente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nit: {type: string}
+                estado: {type: string}
+      responses:
+        200: {description: Estado actualizado correctamente}
+        404: {description: Empresa no encontrada}
+        400: {description: Petición inválida}
+    """
+    data = request.get_json()
+    nit = data.get("nit")
+    nuevo_estado = data.get("estado")
+
+    # Validaciones avanzadas
+    if not is_valid_nit(nit):
+        return jsonify({"error": "NIT inválido. Debe ser numérico y de 6-15 dígitos."}), 400
+    if not is_valid_estado(nuevo_estado):
+        return jsonify({"error": "Estado inválido. Opciones válidas: PENDIENTE, PROCESADO, ERROR."}), 400
+
+    empresa = Empresa.query.filter_by(nit=nit).first()
+    if not empresa:
+        return jsonify({"error": "Empresa no encontrada"}), 404
+
+    empresa.estado = nuevo_estado
+    db.session.commit()
+    return jsonify({"message": "Estado actualizado correctamente", "empresa": empresa.as_dict()}), 200
+
+@bp.route('/empresas', methods=['GET'])
+def listar_empresas():
+    """
+    Lista todas las empresas registradas.
+    ---
+    get:
+      description: Devuelve una lista con todas las empresas almacenadas.
+      responses:
+        200:
+          description: Lista de empresas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  empresas:
+                    type: array
+                    items:
+                      type: object
+    """
+    empresas = Empresa.query.all()
+    return jsonify({"empresas": [e.as_dict() for e in empresas]}), 200
+@bp.route('/empresa/<nit>', methods=['GET'])
+def consultar_empresa(nit):
+    """
+    Consulta una empresa por su NIT.
+    ---
+    get:
+      description: Devuelve los datos de una empresa específica por su NIT.
+      parameters:
+        - in: path
+          name: nit
+          schema:
+            type: string
+          required: true
+          description: NIT de la empresa a consultar
+      responses:
+        200:
+          description: Empresa encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  empresa:
+                    type: object
+        404:
+          description: Empresa no encontrada
+    """
+    empresa = Empresa.query.filter_by(nit=nit).first()
+    if not empresa:
+        return jsonify({"error": "Empresa no encontrada"}), 404
+    return jsonify({"empresa": empresa.as_dict()}), 200
+@bp.route('/empresa/<nit>', methods=['DELETE'])
+def eliminar_empresa(nit):
+    """
+    Elimina una empresa por su NIT.
+    ---
+    delete:
+      description: Elimina la empresa cuyo NIT se indica.
+      parameters:
+        - in: path
+          name: nit
+          schema:
+            type: string
+          required: true
+          description: NIT de la empresa a eliminar
+      responses:
+        200:
+          description: Empresa eliminada correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Empresa no encontrada
+    """
+    empresa = Empresa.query.filter_by(nit=nit).first()
+    if not empresa:
+        return jsonify({"error": "Empresa no encontrada"}), 404
+    db.session.delete(empresa)
+    db.session.commit()
+    return jsonify({"message": "Empresa eliminada correctamente"}), 200
