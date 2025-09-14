@@ -28,7 +28,7 @@ def home():
         ]
     }), 200
 
-@bp.route('/process-data', methods=['POST'])
+@bp.route("/process-data", methods=["POST"])
 def process_data():
     """
     Procesa y almacena datos de una empresa.
@@ -52,23 +52,33 @@ def process_data():
     data = request.get_json()
     nit = data.get("nit")
     nombre = data.get("nombre")
-    datos = data.get("datos", {})
 
-    # Validaciones avanzadas
-    if not is_valid_nit(nit):
-        return jsonify({"error": "NIT inválido. Debe ser numérico y de 6-15 dígitos."}), 400
-    if not is_valid_nombre(nombre):
-        return jsonify({"error": "Nombre de empresa inválido."}), 400
-    if not isinstance(datos, dict):
-        return jsonify({"error": "El campo 'datos' debe ser un objeto/dict."}), 400
+    # Validaciones básicas
+    if not nit or not nombre:
+        return jsonify({"error": "Los campos 'nit' y 'nombre' son obligatorios"}), 400
 
-    if Empresa.query.filter_by(nit=nit).first():
-        return jsonify({"error": "Empresa con ese NIT ya existe."}), 400
+    # Eliminar "datos" si viene vacío
+    if "datos" in data and not data["datos"]:
+        data.pop("datos")
 
-    empresa = Empresa(nit=nit, nombre=nombre, datos=datos)
+    # Capturar otros campos diferentes a nit/nombre
+    otros_datos = data.get("datos")
+    if not otros_datos:
+        otros_datos = None
+
+    empresa = Empresa(
+        nit=nit,
+        nombre=nombre,
+        datos=otros_datos  #  nunca guarda {}
+    )
+
     db.session.add(empresa)
     db.session.commit()
-    return jsonify({"message": "Empresa almacenada correctamente", "empresa": empresa.as_dict()}), 200
+
+    return jsonify({
+        "message": "Empresa almacenada correctamente",
+        "empresa": empresa.as_dict()
+    }), 201
 
 @bp.route('/update-status', methods=['POST'])
 def update_status():
@@ -195,4 +205,5 @@ def eliminar_empresa(nit):
     db.session.delete(empresa)
     db.session.commit()
     return jsonify({"message": "Empresa eliminada correctamente"}), 200
+
 
