@@ -7,13 +7,16 @@ class Empresa(db.Model):
     nit = db.Column(db.String, unique=True, nullable=False)
     nombre = db.Column(db.String, nullable=False)
     estado = db.Column(db.String, default="PENDIENTE")
-    datos = db.Column(db.JSON)
+    datos = db.Column(db.JSON, nullable=True)
 
     def as_dict(self):
-        return {
+        empresa_dict = {
             "id": self.id,
             "nit": self.nit,
             "nombre": self.nombre,
             "estado": self.estado,
-            "datos": self.datos,
         }
+        # Solo incluir "datos" si realmente existe
+        if self.datos is not None and self.datos != {}: 
+            empresa_dict["datos"] = self.datos
+        return empresa_dict
